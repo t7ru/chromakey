@@ -49,7 +49,7 @@ func main() {
 	// (I personally don't do this step, but it's available if you want to remove residues)
 	// Only works on RGBA images; returns a new *image.RGBA.
 	if rgba, ok := transparentImg.(*image.RGBA); ok {
-		transparentImg = chromakey.ErodeAlpha(rgba)
+		transparentImg = chromakey.Erode(rgba)
 	}
 }
 ```
@@ -57,7 +57,7 @@ func main() {
 ## Features
 
 - **Remove()**: Returns a new image with pixels matching the target color (within the provided RGB distance threshold) made transparent. Fast-paths exist for `*image.RGBA` and `*image.NRGBA`.
-- **ErodeAlpha()**: Removes exactly 1 pixel of alpha along all edges to reduce any color spill residue.
+- **Erode()**: Removes exactly 1 pixel of alpha along all edges to reduce any color spill residue.
 
 ## Performance
 
@@ -69,4 +69,4 @@ Here are some benchmarks run on a mid-range Intel i5-11400H, Go 1.26.0:
 | :--- | :--- | :--- | :--- |
 | **Remove()** | `*image.RGBA` | **~4.8 ms** / op | 2 allocs |
 | **Remove()** | `*image.NRGBA` | **~5.6 ms** / op | 2 allocs |
-| **ErodeAlpha()** | `*image.RGBA` | **~7.5 ms** / op | 2 allocs |
+| **Erode()** | `*image.RGBA` | **~7.5 ms** / op | 2 allocs |

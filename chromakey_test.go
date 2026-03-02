@@ -35,7 +35,7 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-func TestErodeAlpha(t *testing.T) {
+func TestErode(t *testing.T) {
 	img := image.NewRGBA(image.Rect(0, 0, 5, 5))
 	opaque := color.RGBA{R: 255, G: 255, B: 255, A: 255}
 
@@ -45,7 +45,7 @@ func TestErodeAlpha(t *testing.T) {
 		}
 	}
 
-	result := ErodeAlpha(img)
+	result := Erode(img)
 
 	if _, _, _, a := result.At(2, 2).RGBA(); a == 0 {
 		t.Errorf("Expected absolute center pixel to remain opaque")
@@ -108,7 +108,7 @@ func BenchmarkRemove_Fallback_1080p(b *testing.B) {
 	}
 }
 
-func BenchmarkErodeAlpha_1080p(b *testing.B) {
+func BenchmarkErode_1080p(b *testing.B) {
 	img := image.NewRGBA(image.Rect(0, 0, 1920, 1080))
 
 	opaque := color.RGBA{R: 255, G: 255, B: 255, A: 255}
@@ -121,7 +121,7 @@ func BenchmarkErodeAlpha_1080p(b *testing.B) {
 
 	b.ResetTimer()
 	for b.Loop() {
-		ErodeAlpha(img)
+		Erode(img)
 	}
 }
 
@@ -135,12 +135,12 @@ func BenchmarkChromaKeyRemove_1024x1024(b *testing.B) {
 	}
 }
 
-func BenchmarkErodeAlpha_1024x1024(b *testing.B) {
+func BenchmarkErode_1024x1024(b *testing.B) {
 	src := makeTestRGBA(1024, 1024, 42)
 	draw.Draw(src, image.Rect(0, 0, 256, 256), &image.Uniform{C: color.RGBA{0, 0, 0, 0}}, image.Point{}, draw.Src)
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		_ = ErodeAlpha(src)
+		_ = Erode(src)
 	}
 }

@@ -137,9 +137,9 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 	return newImg
 }
 
-// ErodeAlpha removes 1 pixel of alpha by clearing any
+// Erode removes 1 pixel of alpha by clearing any
 // opaque pixel that touches a fully transparent pixel.
-func ErodeAlpha(img *image.RGBA) *image.RGBA {
+func Erode(img *image.RGBA) *image.RGBA {
 	bounds := img.Bounds()
 	refined := image.NewRGBA(bounds)
 	stride := img.Stride
