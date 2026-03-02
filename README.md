@@ -61,9 +61,9 @@ func main() {
 
 ## Performance
 
-The package avoids generic wrappers and aggressively utilizes Go's bounds check elimination patterns to process millions of pixels in milliseconds.
+The package avoids generic wrappers and aggressively utilizes Go's bounds check elimination patterns to process millions of pixels in just a few milliseconds.
 
-Here are benchmarks ran on a mid-range Intel i5-11400H, Go 1.26.0:
+Here are some benchmarks run on a mid-range Intel i5-11400H, Go 1.26.0:
 
 | Operation | Image Type | Execution Time | Allocations |
 | :--- | :--- | :--- | :--- |
