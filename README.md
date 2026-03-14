@@ -58,9 +58,9 @@ func main() {
 
 ## Functions
 
-- **Remove()**: Returns a new image with pixels matching the target color (within the provided RGB distance threshold) made transparent. Fast-paths exist for `*image.RGBA` and `*image.NRGBA`.
-- **RemoveRange()**: Applies a soft chroma key using YCbCr distance. Supports semi-transparency gradients and includes color spill suppression.
-- **Erode()**: Removes exactly 1 pixel of alpha along all edges by clearing any opaque pixel that touches a fully transparent pixel.
+- **Remove()**: Removes pixels within the given BT.601 chroma distance of the key color. Fast-paths exist for `*image.RGBA` and `*image.NRGBA`.
+- **RemoveRange()**: Soft chroma key using BT.601 chroma distance. Pixels within `minThreshold` become fully transparent, pixels beyond `maxThreshold` are kept, and pixels in between receive proportional transparency and color spill suppression.
+- **Erode()**: Removes exactly 1 pixel of alpha along all edges by clearing any opaque pixel adjacent to a fully transparent pixel.
 
 ## Performance
 

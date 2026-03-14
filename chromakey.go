@@ -10,19 +10,33 @@ import (
 	"sync"
 )
 
-// Remove returns a new RGBA image where pixels whose RGB values are within
+// chromaCb and chromaCr compute BT.601 chroma components (range ~16-240).
+// Used for luminance independent keying so dark pixels always have neutral
+// chroma and are never falsely pulled into the removal range.
+func chromaCb(r, g, b int32) int32 {
+	return ((-38*r - 74*g + 112*b + 128) >> 8) + 128
+}
+
+func chromaCr(r, g, b int32) int32 {
+	return ((112*r - 94*g - 18*b + 128) >> 8) + 128
+}
+
+func clampF32(v float32) uint8 {
+	return uint8(max(float32(0), min(float32(255), v)))
+}
+
+// Remove returns a new RGBA image where pixels whose chroma is within
 // the given threshold of keyColor are made fully transparent.
 //
-// threshold is the squared Euclidean RGB distance (dr^2 + dg^2 + db^2).
+// threshold is the squared Euclidean distance of BT.601 chroma components (dCb^2 + dCr^2).
 func Remove(img image.Image, keyColor color.Color, threshold float64) image.Image {
 	bounds := img.Bounds()
 	newImg := image.NewRGBA(bounds)
 	thresh := int32(threshold)
 
 	kr32, kg32, kb32, _ := keyColor.RGBA()
-	kr := int32(kr32 >> 8)
-	kg := int32(kg32 >> 8)
-	kb := int32(kb32 >> 8)
+	keyCb := chromaCb(int32(kr32>>8), int32(kg32>>8), int32(kb32>>8))
+	keyCr := chromaCr(int32(kr32>>8), int32(kg32>>8), int32(kb32>>8))
 
 	numWorkers := runtime.NumCPU()
 	height := bounds.Dy()
@@ -49,10 +63,9 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 
 					for x := 0; x < width4; x += 4 {
 						r, g, b, a := rowSrc[x], rowSrc[x+1], rowSrc[x+2], rowSrc[x+3]
-						dr := int32(r) - kr
-						dg := int32(g) - kg
-						db := int32(b) - kb
-						if dr*dr+dg*dg+db*db < thresh {
+						dcb := chromaCb(int32(r), int32(g), int32(b)) - keyCb
+						dcr := chromaCr(int32(r), int32(g), int32(b)) - keyCr
+						if dcb*dcb+dcr*dcr < thresh {
 							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = 0, 0, 0, 0
 						} else {
 							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = r, g, b, a
@@ -83,12 +96,10 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 
 					for x := 0; x < width4; x += 4 {
 						a := rowSrc[x+3]
-						var r, g, b uint8
-						// Convert unpremultiplied NRGBA to premultiplied RGB
-						// so distance comparison matches the RGBA behavior.
+						var ri, gi, bi int32
 						switch a {
 						case 0xff:
-							r, g, b = rowSrc[x], rowSrc[x+1], rowSrc[x+2]
+							ri, gi, bi = int32(rowSrc[x]), int32(rowSrc[x+1]), int32(rowSrc[x+2])
 						case 0:
 							continue
 						default:
@@ -101,16 +112,15 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 							b32 := uint32(rowSrc[x+2])
 							b32 |= b32 << 8
 							b32 = b32 * uint32(a) / 0xff
-							r, g, b = uint8(r32>>8), uint8(g32>>8), uint8(b32>>8)
+							ri, gi, bi = int32(r32>>8), int32(g32>>8), int32(b32>>8)
 						}
 
-						dr := int32(r) - kr
-						dg := int32(g) - kg
-						db := int32(b) - kb
-						if dr*dr+dg*dg+db*db < thresh {
+						dcb := chromaCb(ri, gi, bi) - keyCb
+						dcr := chromaCr(ri, gi, bi) - keyCr
+						if dcb*dcb+dcr*dcr < thresh {
 							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = 0, 0, 0, 0
 						} else {
-							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = r, g, b, a
+							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = rowSrc[x], rowSrc[x+1], rowSrc[x+2], a
 						}
 					}
 				}
@@ -141,10 +151,9 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 						b := uint8(b32 >> 8)
 						a := uint8(a32 >> 8)
 
-						dr := int32(r) - kr
-						dg := int32(g) - kg
-						db := int32(b) - kb
-						if dr*dr+dg*dg+db*db < thresh {
+						dcb := chromaCb(int32(r), int32(g), int32(b)) - keyCb
+						dcr := chromaCr(int32(r), int32(g), int32(b)) - keyCr
+						if dcb*dcb+dcr*dcr < thresh {
 							rowDst[dstX], rowDst[dstX+1], rowDst[dstX+2], rowDst[dstX+3] = 0, 0, 0, 0
 						} else {
 							rowDst[dstX], rowDst[dstX+1], rowDst[dstX+2], rowDst[dstX+3] = r, g, b, a
@@ -195,21 +204,6 @@ func Erode(img *image.RGBA) *image.RGBA {
 		}
 	}
 	return refined
-}
-
-// chromaCb and chromaCr compute BT.601 chroma components (range ~16-240).
-// Used for luminance independent keying so dark pixels always have neutral
-// chroma and are never falsely pulled into the removal range.
-func chromaCb(r, g, b int32) int32 {
-	return ((-38*r - 74*g + 112*b + 128) >> 8) + 128
-}
-
-func chromaCr(r, g, b int32) int32 {
-	return ((112*r - 94*g - 18*b + 128) >> 8) + 128
-}
-
-func clampF32(v float32) uint8 {
-	return uint8(max(float32(0), min(float32(255), v)))
 }
 
 // RemoveRange returns a new RGBA image applying a soft chroma key.
