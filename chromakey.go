@@ -24,118 +24,137 @@ func Remove(img image.Image, keyColor color.Color, threshold float64) image.Imag
 	kg := int32(kg32 >> 8)
 	kb := int32(kb32 >> 8)
 
+	numWorkers := runtime.NumCPU()
+	height := bounds.Dy()
+	rowsPerWorker := (height + numWorkers - 1) / numWorkers
+
 	switch src := img.(type) {
 	case *image.RGBA:
-		width4 := bounds.Dx() * 4
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			i := src.PixOffset(bounds.Min.X, y)
-			j := newImg.PixOffset(bounds.Min.X, y)
-			rowSrc := src.Pix[i : i+width4]
-			rowDst := newImg.Pix[j : j+width4]
-
-			for x := 0; x < width4; x += 4 {
-				r, g, b, a := rowSrc[x], rowSrc[x+1], rowSrc[x+2], rowSrc[x+3]
-				dr := int32(r) - kr
-				dg := int32(g) - kg
-				db := int32(b) - kb
-				if dr*dr+dg*dg+db*db < thresh {
-					rowDst[x] = 0
-					rowDst[x+1] = 0
-					rowDst[x+2] = 0
-					rowDst[x+3] = 0
-				} else {
-					rowDst[x] = r
-					rowDst[x+1] = g
-					rowDst[x+2] = b
-					rowDst[x+3] = a
-				}
+		var wg sync.WaitGroup
+		for w := range numWorkers {
+			startY := bounds.Min.Y + w*rowsPerWorker
+			endY := min(startY+rowsPerWorker, bounds.Max.Y)
+			if startY >= bounds.Max.Y {
+				break
 			}
+			wg.Add(1)
+			go func(startY, endY int) {
+				defer wg.Done()
+				width4 := bounds.Dx() * 4
+				for y := startY; y < endY; y++ {
+					i := src.PixOffset(bounds.Min.X, y)
+					j := newImg.PixOffset(bounds.Min.X, y)
+					rowSrc := src.Pix[i : i+width4]
+					rowDst := newImg.Pix[j : j+width4]
+
+					for x := 0; x < width4; x += 4 {
+						r, g, b, a := rowSrc[x], rowSrc[x+1], rowSrc[x+2], rowSrc[x+3]
+						dr := int32(r) - kr
+						dg := int32(g) - kg
+						db := int32(b) - kb
+						if dr*dr+dg*dg+db*db < thresh {
+							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = 0, 0, 0, 0
+						} else {
+							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = r, g, b, a
+						}
+					}
+				}
+			}(startY, endY)
 		}
+		wg.Wait()
+
 	case *image.NRGBA:
-		width4 := bounds.Dx() * 4
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			i := src.PixOffset(bounds.Min.X, y)
-			j := newImg.PixOffset(bounds.Min.X, y)
-			rowSrc := src.Pix[i : i+width4]
-			rowDst := newImg.Pix[j : j+width4]
-
-			for x := 0; x < width4; x += 4 {
-				a := rowSrc[x+3]
-				var r, g, b uint8
-				// Convert unpremultiplied NRGBA to premultiplied RGB
-				// so distance comparison matches the RGBA behavior.
-				switch a {
-				case 0xff:
-					r, g, b = rowSrc[x], rowSrc[x+1], rowSrc[x+2]
-				case 0:
-					r, g, b = 0, 0, 0
-				default:
-					r32 := uint32(rowSrc[x])
-					r32 |= r32 << 8
-					r32 *= uint32(a)
-					r32 /= 0xff
-
-					g32 := uint32(rowSrc[x+1])
-					g32 |= g32 << 8
-					g32 *= uint32(a)
-					g32 /= 0xff
-
-					b32 := uint32(rowSrc[x+2])
-					b32 |= b32 << 8
-					b32 *= uint32(a)
-					b32 /= 0xff
-
-					r, g, b = uint8(r32>>8), uint8(g32>>8), uint8(b32>>8)
-				}
-
-				dr := int32(r) - kr
-				dg := int32(g) - kg
-				db := int32(b) - kb
-				if dr*dr+dg*dg+db*db < thresh {
-					rowDst[x] = 0
-					rowDst[x+1] = 0
-					rowDst[x+2] = 0
-					rowDst[x+3] = 0
-				} else {
-					rowDst[x] = r
-					rowDst[x+1] = g
-					rowDst[x+2] = b
-					rowDst[x+3] = a
-				}
+		var wg sync.WaitGroup
+		for w := range numWorkers {
+			startY := bounds.Min.Y + w*rowsPerWorker
+			endY := min(startY+rowsPerWorker, bounds.Max.Y)
+			if startY >= bounds.Max.Y {
+				break
 			}
+			wg.Add(1)
+			go func(startY, endY int) {
+				defer wg.Done()
+				width4 := bounds.Dx() * 4
+				for y := startY; y < endY; y++ {
+					i := src.PixOffset(bounds.Min.X, y)
+					j := newImg.PixOffset(bounds.Min.X, y)
+					rowSrc := src.Pix[i : i+width4]
+					rowDst := newImg.Pix[j : j+width4]
+
+					for x := 0; x < width4; x += 4 {
+						a := rowSrc[x+3]
+						var r, g, b uint8
+						// Convert unpremultiplied NRGBA to premultiplied RGB
+						// so distance comparison matches the RGBA behavior.
+						switch a {
+						case 0xff:
+							r, g, b = rowSrc[x], rowSrc[x+1], rowSrc[x+2]
+						case 0:
+							continue
+						default:
+							r32 := uint32(rowSrc[x])
+							r32 |= r32 << 8
+							r32 = r32 * uint32(a) / 0xff
+							g32 := uint32(rowSrc[x+1])
+							g32 |= g32 << 8
+							g32 = g32 * uint32(a) / 0xff
+							b32 := uint32(rowSrc[x+2])
+							b32 |= b32 << 8
+							b32 = b32 * uint32(a) / 0xff
+							r, g, b = uint8(r32>>8), uint8(g32>>8), uint8(b32>>8)
+						}
+
+						dr := int32(r) - kr
+						dg := int32(g) - kg
+						db := int32(b) - kb
+						if dr*dr+dg*dg+db*db < thresh {
+							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = 0, 0, 0, 0
+						} else {
+							rowDst[x], rowDst[x+1], rowDst[x+2], rowDst[x+3] = r, g, b, a
+						}
+					}
+				}
+			}(startY, endY)
 		}
+		wg.Wait()
+
 	default:
-		width4 := bounds.Dx() * 4
-		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-			j := newImg.PixOffset(bounds.Min.X, y)
-			rowDst := newImg.Pix[j : j+width4]
-
-			dstX := 0
-			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				r32, g32, b32, a32 := src.At(x, y).RGBA()
-				r := uint8(r32 >> 8)
-				g := uint8(g32 >> 8)
-				b := uint8(b32 >> 8)
-				a := uint8(a32 >> 8)
-
-				dr := int32(r) - kr
-				dg := int32(g) - kg
-				db := int32(b) - kb
-
-				if dr*dr+dg*dg+db*db < thresh {
-					rowDst[dstX] = 0
-					rowDst[dstX+1] = 0
-					rowDst[dstX+2] = 0
-					rowDst[dstX+3] = 0
-				} else {
-					rowDst[dstX] = r
-					rowDst[dstX+1] = g
-					rowDst[dstX+2] = b
-					rowDst[dstX+3] = a
-				}
-				dstX += 4
+		var wg sync.WaitGroup
+		for w := range numWorkers {
+			startY := bounds.Min.Y + w*rowsPerWorker
+			endY := min(startY+rowsPerWorker, bounds.Max.Y)
+			if startY >= bounds.Max.Y {
+				break
 			}
+			wg.Add(1)
+			go func(startY, endY int) {
+				defer wg.Done()
+				width4 := bounds.Dx() * 4
+				for y := startY; y < endY; y++ {
+					j := newImg.PixOffset(bounds.Min.X, y)
+					rowDst := newImg.Pix[j : j+width4]
+					dstX := 0
+					for x := bounds.Min.X; x < bounds.Max.X; x++ {
+						r32, g32, b32, a32 := src.At(x, y).RGBA()
+						r := uint8(r32 >> 8)
+						g := uint8(g32 >> 8)
+						b := uint8(b32 >> 8)
+						a := uint8(a32 >> 8)
+
+						dr := int32(r) - kr
+						dg := int32(g) - kg
+						db := int32(b) - kb
+						if dr*dr+dg*dg+db*db < thresh {
+							rowDst[dstX], rowDst[dstX+1], rowDst[dstX+2], rowDst[dstX+3] = 0, 0, 0, 0
+						} else {
+							rowDst[dstX], rowDst[dstX+1], rowDst[dstX+2], rowDst[dstX+3] = r, g, b, a
+						}
+						dstX += 4
+					}
+				}
+			}(startY, endY)
 		}
+		wg.Wait()
 	}
 	return newImg
 }
