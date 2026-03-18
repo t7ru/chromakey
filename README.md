@@ -2,6 +2,12 @@
 
 A high-performance, zero-dependency Go package for chroma key background removal and alpha edge erosion. Originally designed for [pseudo3d](https://github.com/paradoxum-wikis/pseudo3d) to process batches of 4K images at extremely high speed.
 
+| Before | After |
+| ------ | ----- |
+| ![](https://bin.t7ru.link/fol/158781021_0_1773613368753.png) | ![](https://bin.t7ru.link/fol/oneshot.png) |
+| ![](https://bin.t7ru.link/fol/accel1.png) | ![](https://bin.t7ru.link/fol/accel.png) |
+| ![](https://bin.t7ru.link/fol/onesho2.png?vv) | ![](https://bin.t7ru.link/fol/onesho.png?vv) |
+
 ## Installation
 
 ```bash
@@ -73,4 +79,4 @@ Here are some benchmarks run on a mid-range Intel i5-11400H, Go 1.26.0:
 | **Remove()** | `*image.NRGBA` | **~0.7 ms** / op | 27 allocs |
 | **Remove()** | `*image.RGBA` | **~1.6 ms** / op | 27 allocs |
 | **RemoveRange()** | `*image.RGBA` | **~1.9 ms** / op | 27 allocs |
-| **Erode()** | `*image.RGBA` | **~7.5 ms** / op | 2 allocs |
+| **Erode()** | `*image.RGBA` | **~7.5 ms**c / op | 2 allocs |
