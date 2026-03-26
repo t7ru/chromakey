@@ -1,5 +1,8 @@
 # chromakey
 
+> [!TIP]
+> Check out [rustychroma](https://github.com/t7ru/rustychroma), a port of **chromakey** for Rust, C, C++, and WebAssembly that runs even faster!
+
 A high-performance, zero-dependency Go package for chroma key background removal and alpha edge erosion. Originally designed for [pseudo3d](https://github.com/paradoxum-wikis/pseudo3d) to process batches of 4K images at extremely high speed.
 
 | Before | After |
